@@ -1,6 +1,6 @@
 import os
 
-path = 'test0.1'
+path = 'PaliGemma_dp005'
 with open(path, 'r') as f:
     data = f.readlines()
 
@@ -19,7 +19,6 @@ for line in data:
 assert pred_count == ans_count
 
 total_test_points = pred_count
-print(total_test_points)
 
 correct_count = 0
 for i in range(total_test_points):
