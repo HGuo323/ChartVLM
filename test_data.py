@@ -1,6 +1,6 @@
 import os
 
-path = 'epoch1'
+path = 'test0.1'
 with open(path, 'r') as f:
     data = f.readlines()
 
