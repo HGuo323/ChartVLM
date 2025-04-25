@@ -42,7 +42,6 @@ from transformers import PaliGemmaConfig
 USE_LORA = False
 USE_QLORA = True
 
-## Load model
 
 # Three options for training, from the lowest precision training to the highest precision training:
 # - QLora
@@ -85,60 +84,54 @@ else:
 for name, module in model.named_modules():
     print(f"{name}: {module}")
 
-# import torch, types
-# from transformers import (
-#     BitsAndBytesConfig,
-#     PaliGemmaForConditionalGeneration,
-#     SiglipVisionModel,
-#     SiglipImageProcessor,
-#     PaliGemmaProcessor,
-#     AutoTokenizer,
-# )
-# new_vis_id = "google/siglip-base-patch16-224"
-# vision_tower = SiglipVisionModel.from_pretrained(
-#     new_vis_id, torch_dtype=torch.float16
-# )
+import torch, types
+from transformers import (
+    BitsAndBytesConfig,
+    PaliGemmaForConditionalGeneration,
+    SiglipVisionModel,
+    SiglipImageProcessor,
+    PaliGemmaProcessor,
+    AutoTokenizer,
+)
+new_vis_id = "google/siglip-base-patch16-224"
+vision_tower = SiglipVisionModel.from_pretrained(
+    new_vis_id, torch_dtype=torch.float16
+)
 
-# image_processor = SiglipImageProcessor.from_pretrained(new_vis_id)
+image_processor = SiglipImageProcessor.from_pretrained(new_vis_id)
 
-# # ---------- 3. replace tower + projection ----------
-# # PaliGemma’s get_image_features() calls self.vision_tower and then self.vision_projection
-# model.vision_tower = vision_tower                     # <- swap in place
-# model.config.vision_config = vision_tower.config       # keep config in sync
+model.vision_tower = vision_tower                     
+model.config.vision_config = vision_tower.config       
 
-# # 1. Load the original chartgemma checkpoint (as you already do)
-# bnb_cfg = BitsAndBytesConfig(
-#     load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.float16
-# )
-# orig = PaliGemmaForConditionalGeneration.from_pretrained(
-#     "ahmed-masry/chartgemma",
-#     torch_dtype=torch.float16,
-#     quantization_config=bnb_cfg,
-#     device_map="auto",
-# )
+bnb_cfg = BitsAndBytesConfig(
+    load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.float16
+)
+orig = PaliGemmaForConditionalGeneration.from_pretrained(
+    "ahmed-masry/chartgemma",
+    torch_dtype=torch.float16,
+    quantization_config=bnb_cfg,
+    device_map="auto",
+)
 
-# # 2. Save its projection
-# orig_proj_state = orig.multi_modal_projector.linear.state_dict()
+orig_proj_state = orig.multi_modal_projector.linear.state_dict()
 
-# from transformers import SiglipVisionModel, SiglipImageProcessor
+from transformers import SiglipVisionModel, SiglipImageProcessor
 
-# new_vis_id = "google/siglip-base-patch16-224"
-# vision_tower = SiglipVisionModel.from_pretrained(new_vis_id, torch_dtype=torch.float16)
+new_vis_id = "google/siglip-base-patch16-224"
+vision_tower = SiglipVisionModel.from_pretrained(new_vis_id, torch_dtype=torch.float16)
 
-# model.vision_tower = vision_tower
-# model.config.vision_config = vision_tower.config  # keep config in sync
+model.vision_tower = vision_tower
+model.config.vision_config = vision_tower.config  # keep config in sync
 
-# in_dim  = vision_tower.config.hidden_size         # 768 for ViT‑B/16
-# out_dim = model.config.projection_dim             # 2048 (Gemma hidden size)
+in_dim  = vision_tower.config.hidden_size         # 768 for ViT‑B/16
+out_dim = model.config.projection_dim             # 2048 (Gemma hidden size)
 
-# # overwrite the projector with the correct shape
-# model.multi_modal_projector.linear = torch.nn.Linear(in_dim, out_dim, bias=True)
-# # (optional) freeze the visual backbone to save memory / time
+model.multi_modal_projector.linear = torch.nn.Linear(in_dim, out_dim, bias=True)
 
-# for p in model.vision_tower.parameters():
-#     p.requires_grad = False
+for p in model.vision_tower.parameters():
+    p.requires_grad = False
 
-# model.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(1024, 196)
+model.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(1024, 196)
 
 # for name, module in model.named_modules():
 #     print(f"{name}: {module}")
@@ -180,11 +173,6 @@ from PIL import Image
 from io import BytesIO
 
 class ChartGemmaDataset(Dataset):
-    """
-    PyTorch Dataset for ChartGemma. This class takes a HuggingFace Dataset as input.
-
-    Each row, consists of image path(png/jpg/jpeg) and ground truth data (json/jsonl/txt).
-    """
 
     def __init__(
         self,
@@ -201,13 +189,7 @@ class ChartGemmaDataset(Dataset):
         return self.dataset_length
 
     def __getitem__(self, idx: int) -> Dict:
-        """
-        Returns one item of the dataset.
 
-        Returns:
-            image : the original Receipt image
-            target_sequence : tokenized ground truth sequence
-        """
         sample = self.dataset[idx]
 
         # inputs
