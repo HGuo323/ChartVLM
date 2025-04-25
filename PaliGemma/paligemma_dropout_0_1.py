@@ -39,47 +39,22 @@ processor = AutoProcessor.from_pretrained("ahmed-masry/chartgemma")
 
 import torch
 from transformers import PaliGemmaConfig
-USE_LORA = False
-USE_QLORA = True
 
-
-# Three options for training, from the lowest precision training to the highest precision training:
-# - QLora
-# - Standard Lora
-# - Full fine-tuning
 
 cfg = PaliGemmaConfig.from_pretrained("ahmed-masry/chartgemma")
 cfg.attention_dropout = 0.1
 cfg.hidden_dropout    = 0.1
 
-if USE_QLORA:
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.float16
-    )
-    model = PaliGemmaForConditionalGeneration.from_pretrained(
-        'ahmed-masry/chartgemma',
-        torch_dtype=torch.float16,
-        quantization_config=bnb_config,
-        config=cfg
-    )
-elif USE_LORA:
-    model = PaliGemmaForConditionalGeneration.from_pretrained(
-        'ahmed-masry/chartgemma',
-        torch_dtype=torch.float16,
-    )
-else:
-    # for full fine-tuning, we can speed up the model using Flash Attention
-    # only available on certain devices, see https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file#installation-and-features
-    model = PaliGemmaForConditionalGeneration.from_pretrained(
-        'ahmed-masry/chartgemma',
-        torch_dtype=torch.float16,
-        _attn_implementation="flash_attention_2",
-    )
-    for param in model.vision_tower.parameters():
-       param.requires_grad = False
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.float16
+)
+model = PaliGemmaForConditionalGeneration.from_pretrained(
+    'ahmed-masry/chartgemma',
+    torch_dtype=torch.float16,
+    quantization_config=bnb_config,
+    config=cfg
+)
 
-    for param in model.multi_modal_projector.parameters():
-       param.requires_grad = False
 
 for name, module in model.named_modules():
     print(f"{name}: {module}")
@@ -121,10 +96,10 @@ new_vis_id = "google/siglip-base-patch16-224"
 vision_tower = SiglipVisionModel.from_pretrained(new_vis_id, torch_dtype=torch.float16)
 
 model.vision_tower = vision_tower
-model.config.vision_config = vision_tower.config  # keep config in sync
+model.config.vision_config = vision_tower.config  
 
-in_dim  = vision_tower.config.hidden_size         # 768 for ViT‑B/16
-out_dim = model.config.projection_dim             # 2048 (Gemma hidden size)
+in_dim  = vision_tower.config.hidden_size         
+out_dim = model.config.projection_dim            
 
 model.multi_modal_projector.linear = torch.nn.Linear(in_dim, out_dim, bias=True)
 
@@ -180,7 +155,6 @@ class ChartGemmaDataset(Dataset):
         split: str = "train",
     ):
         super().__init__()
-
         self.split = split
         self.dataset = load_dataset(dataset_name_or_path, split=split)
         self.dataset_length = len(self.dataset)
@@ -189,10 +163,7 @@ class ChartGemmaDataset(Dataset):
         return self.dataset_length
 
     def __getitem__(self, idx: int) -> Dict:
-
         sample = self.dataset[idx]
-
-        # inputs
         image = Image.open(BytesIO(sample["image"])).convert('RGB')
         target_sequence = sample['label']
         input_sequence = sample['query']
@@ -213,7 +184,6 @@ def train_collate_fn(examples):
         input_texts.append(input_text)
         outputs_texts.append(output_text)
 
-    # Change the MX LENGTH depending on the task.
     MAX_LENGTH = 128
     inputs = processor(text=input_texts, images=images, suffix=outputs_texts, return_tensors="pt", padding=True,
                      truncation="only_second", max_length=MAX_LENGTH,
@@ -229,7 +199,6 @@ def train_collate_fn(examples):
 
 
 def eval_collate_fn(examples):
-    # we only feed the prompt to the model
     images = []
     texts = []
     answers = []
@@ -289,11 +258,8 @@ class ChartGemmaModelPLModule(L.LightningModule):
 
         input_ids, attention_mask, pixel_values, answers = batch
 
-        # autoregressively generate token IDs
         generated_ids = self.model.generate(input_ids=input_ids, attention_mask=attention_mask,
                                        pixel_values=pixel_values, max_new_tokens=128)
-        # turn them back into text, chopping of the prompt
-        # important: we don't skip special tokens here, because we want to see them in the output
         predictions = self.processor.batch_decode(generated_ids[:, input_ids.size(1):], skip_special_tokens=True)
 
         scores = []
@@ -341,10 +307,6 @@ config = {"max_epochs": 1,
 model_module = ChartGemmaModelPLModule(config, processor, model)
 
 
-
-# from lightning.pytorch.loggers import WandbLogger
-# wandb_logger = WandbLogger(project=WANDB_PROJECT, name=WANDB_NAME)
-
 trainer = L.Trainer(
         accelerator="gpu",
         devices=[0],
@@ -359,9 +321,6 @@ trainer = L.Trainer(
 
 trainer.fit(model_module)
 
-
-
-# Save Model locally
 # Save Model locally
 model_module.model.save_pretrained('/content/drive/MyDrive/trained_model3')
 model_module.processor.save_pretrained('/content/drive/MyDrive/trained_model3')
