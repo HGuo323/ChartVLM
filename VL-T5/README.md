@@ -37,8 +37,8 @@ Download the pretrained VL-T5 checkpoint from:
 We use visual features extracted by the fine-tuned Mask R-CNN model provided here:  
 [Chart-Mask-RCNN](https://huggingface.co/ahmed-masry/Chart-Mask-RCNN).
 
-All extracted feature files (`.json`) for both training,validation, and testing sets have been packed into a `.zip` file and uploaded to this repository.  
-You can simply unzip it following the structure shown above.
+All extracted feature files (`.json`) for training, validation, and testing sets have been packed into a `.zip` file and uploaded to [Google Drive](https://drive.google.com/file/d/1tbTAvXINqjpxk_h_BLOWGURqSedR8IIg/view?usp=sharing).  
+You can simply download and unzip it following the structure shown above.
 
 There is no need to train or run Mask R-CNN yourself unless you wish to re-generate features.
 
